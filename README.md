@@ -32,7 +32,29 @@ make quality     # Format, lint, typecheck
 make test-all    # Full suite including @integration tests (needs a real key + network)
 ```
 
-Run anything directly through uv, e.g.:
+## CLI
+
+Mailbox ships a small command-line interface (read-only for now). Run it with
+`uv run python -m mailbox`:
+
+```bash
+uv run python -m mailbox --help
+uv run python -m mailbox subscribers list             # first 20 subscribers
+uv run python -m mailbox subscribers list --status active --limit 50
+uv run python -m mailbox subscribers list --all       # walk every page
+```
+
+Example output:
+
+```text
+ID          EMAIL                 NAME   STATE
+4163290803  ada@example.com       Ada    active
+4163249277  grace@example.com     Grace  active
+
+2 subscriber(s).
+```
+
+You can also drive the client library directly:
 
 ```bash
 uv run python -c "from mailbox.kit import KitClient; print(KitClient().get_subscriber(1))"

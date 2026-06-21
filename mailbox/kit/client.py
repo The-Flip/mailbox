@@ -11,6 +11,7 @@ safety) and ``docs/Testing.md`` for how to test against a mocked transport.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from types import TracebackType
 from typing import Any
 
@@ -108,17 +109,59 @@ class KitClient:
         """POST to ``path`` and return the parsed JSON body."""
         return self.request("POST", path, **kwargs)
 
-    # -- example resource method -------------------------------------------
+    # -- subscribers -------------------------------------------------------
 
     def get_subscriber(self, subscriber_id: int) -> dict[str, Any]:
         """Fetch a single subscriber by id.
 
-        Returns the ``subscriber`` object from Kit's response. Add sibling
-        methods (``list_subscribers``, ``add_tag``, ...) following this shape
-        as the project grows — see ``docs/KitAPI.md``.
+        Returns the ``subscriber`` object from Kit's response.
         """
         body = self.get(f"/subscribers/{subscriber_id}")
         return body["subscriber"]
+
+    def list_subscribers(
+        self,
+        *,
+        per_page: int | None = None,
+        status: str | None = None,
+        after: str | None = None,
+        **params: Any,
+    ) -> dict[str, Any]:
+        """Fetch one page of subscribers.
+
+        Returns the raw body: ``{"subscribers": [...], "pagination": {...}}``.
+        ``per_page`` maxes out at 1000 (Kit's default is 500). Pass ``after``
+        with a page's ``pagination.end_cursor`` to get the next page, or use
+        :meth:`iter_subscribers` to walk every page automatically.
+        """
+        query: dict[str, Any] = dict(params)
+        if per_page is not None:
+            query["per_page"] = per_page
+        if status is not None:
+            query["status"] = status
+        if after is not None:
+            query["after"] = after
+        return self.get("/subscribers", params=query)
+
+    def iter_subscribers(
+        self,
+        *,
+        per_page: int | None = None,
+        status: str | None = None,
+        **params: Any,
+    ) -> Iterator[dict[str, Any]]:
+        """Yield every subscriber, transparently following cursor pagination."""
+        after: str | None = None
+        while True:
+            body = self.list_subscribers(per_page=per_page, status=status, after=after, **params)
+            yield from body.get("subscribers", [])
+
+            pagination = body.get("pagination") or {}
+            if not pagination.get("has_next_page"):
+                return
+            after = pagination.get("end_cursor")
+            if not after:  # defensive: no cursor means we can't advance
+                return
 
     # -- error mapping -----------------------------------------------------
 
