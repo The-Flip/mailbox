@@ -1,0 +1,111 @@
+[project]
+name = "mailbox"
+version = "0.1.0"
+description = "Mailing-list management for The Flip pinball museum, built on the Kit (kit.com) API"
+readme = "README.md"
+requires-python = ">=3.14"
+license = { text = "Apache-2.0" }
+dependencies = [
+    # HTTP client for the Kit v4 API. httpx ships its own type hints.
+    "httpx>=0.28",
+    # Read configuration/secrets from environment variables, never hardcoded.
+    "python-decouple>=3.8",
+]
+
+[dependency-groups]
+# Installed with `uv sync` (default); skip with `uv sync --no-dev`.
+dev = [
+    "ruff>=0.14",
+    "mypy>=1.19",
+    "pytest>=8.4",
+    "pytest-cov>=6.0",
+    "pre-commit>=4.5",
+    "detect-secrets>=1.5",
+]
+
+[tool.uv]
+# This is an application, not a distributable library — don't try to build/install
+# the `mailbox` package itself. Tests import it via `pythonpath` (see pytest config).
+package = false
+
+[tool.ruff]
+target-version = "py314"
+
+# Line length to match common Python conventions.
+line-length = 100
+
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "S",   # flake8-bandit (security)
+    "T20", # flake8-print
+    "RUF", # Ruff-specific rules
+]
+
+ignore = [
+    "E501",  # Line too long (handled by the formatter)
+    "S101",  # Use of assert (okay in tests)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["S101", "S105", "S106"]  # asserts and dummy secrets are fine in tests
+"scripts/*.py" = ["T201"]                # allow print in build/CLI scripts
+
+[tool.ruff.lint.isort]
+known-first-party = ["mailbox"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.14"
+# Permissive to start — tighten as the codebase grows.
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = false
+# Suppress noise from third-party packages that ship no type stubs.
+disable_error_code = ["import-untyped", "import-not-found"]
+
+[tool.pytest.ini_options]
+# Package lives at the repo root (not installed), so put it on the import path.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "integration: tests that hit the live Kit API (excluded from the fast suite)",
+]
+
+[tool.coverage.run]
+source = ["mailbox"]
+omit = ["tests/*", "*/__pycache__/*", ".venv/*"]
+
+[tool.coverage.report]
+# Raise this floor as test coverage improves.
+fail_under = 0
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+]
