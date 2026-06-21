@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 license = { text = "Apache-2.0" }
 dependencies = [
+    "click>=8.4.1",
     # HTTP client for the Kit v4 API. httpx ships its own type hints.
     "httpx>=0.28",
     # Read configuration/secrets from environment variables, never hardcoded.

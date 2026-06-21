@@ -73,3 +73,42 @@ def test_5xx_maps_to_server_error():
 
     with make_client(handler) as client, pytest.raises(KitServerError):
         client.get("/subscribers")
+
+
+def test_list_subscribers_passes_query_params():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v4/subscribers"
+        assert request.url.params["per_page"] == "2"
+        assert request.url.params["status"] == "active"
+        return httpx.Response(200, json={"subscribers": [], "pagination": {}})
+
+    with make_client(handler) as client:
+        client.list_subscribers(per_page=2, status="active")
+
+
+def test_iter_subscribers_follows_cursor_pagination():
+    """The iterator should walk every page via end_cursor and stop cleanly."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        after = request.url.params.get("after")
+        if after is None:
+            return httpx.Response(
+                200,
+                json={
+                    "subscribers": [{"id": 1}, {"id": 2}],
+                    "pagination": {"has_next_page": True, "end_cursor": "CUR2"},
+                },
+            )
+        assert after == "CUR2"
+        return httpx.Response(
+            200,
+            json={
+                "subscribers": [{"id": 3}],
+                "pagination": {"has_next_page": False, "end_cursor": None},
+            },
+        )
+
+    with make_client(handler) as client:
+        ids = [s["id"] for s in client.iter_subscribers(per_page=2)]
+
+    assert ids == [1, 2, 3]
