@@ -12,7 +12,7 @@ Two good approaches:
 
    ```python
    import httpx
-   from mailbox.kit.client import KitClient
+   from flipmail.kit.client import KitClient
 
    def test_get_subscriber():
        def handler(request: httpx.Request) -> httpx.Response:
@@ -30,7 +30,7 @@ Avoid `unittest.mock.patch` on `httpx` internals — it couples tests to impleme
 
 ## Test organization
 
-- Tests live in `tests/` and mirror the package: `mailbox/kit/client.py` → `tests/test_client.py`.
+- Tests live in `tests/` and mirror the package: `flipmail/kit/client.py` → `tests/test_client.py`.
 - Name tests descriptively (`test_list_subscribers_follows_pagination`), and give non-obvious ones a one-line docstring explaining what behavior they pin down.
 - Put shared fixtures in `tests/conftest.py`.
 - Generate any secrets/tokens dynamically (`secrets.token_hex(16)`) — never commit a literal that `detect-secrets` would flag.

@@ -34,31 +34,41 @@ make test-all    # Full suite including @integration tests (needs a real key + n
 
 ## CLI
 
-Mailbox ships a small command-line interface (read-only for now). Run it with
-`uv run python -m mailbox`:
+Mailbox ships a `mailbox` command. `make bootstrap` (or `uv sync`) installs it into
+the project venv, so `uv run mailbox …` works immediately. To type plain `mailbox`
+from anywhere, install it on your PATH:
 
 ```bash
-uv run python -m mailbox --help
-uv run python -m mailbox subscribers list             # first 20 subscribers
-uv run python -m mailbox subscribers list --status active --limit 50
-uv run python -m mailbox subscribers list --all       # walk every page
-uv run python -m mailbox subscribers list --tags      # include each subscriber's tags
+uv tool install --editable .   # adds `mailbox` to ~/.local/bin (editable: tracks the source)
+```
+
+After that, `mailbox` works from any directory (it still reads this project's `.env`).
+The examples below use the bare command; prefix with `uv run` if you skipped the
+install step. The import package is `flipmail` (the command is `mailbox`) — see
+[docs/Project_Structure.md](docs/Project_Structure.md) for why.
+
+```bash
+mailbox --help
+mailbox subscribers list             # first 20 subscribers
+mailbox subscribers list --status active --limit 50
+mailbox subscribers list --all       # walk every page
+mailbox subscribers list --tags      # include each subscriber's tags
 ```
 
 ### Tags
 
 ```bash
-uv run python -m mailbox tags list                    # the account's tags
-uv run python -m mailbox tags create "Volunteers"     # idempotent
+mailbox tags list                    # the account's tags
+mailbox tags create "Volunteers"     # idempotent
 
 # Add/remove a tag, by id or email, individually or in bulk.
 # TAG is a tag name (resolved for you) or a numeric tag id.
-uv run python -m mailbox tags add "Volunteers" 12345 ada@flip.museum
-uv run python -m mailbox tags add "Volunteers" --from-status active --dry-run
-uv run python -m mailbox tags add "Volunteers" --all --dry-run         # everyone (preview)
-uv run python -m mailbox tags add "Volunteers" --from-file emails.txt   # '-' = stdin
-uv run python -m mailbox tags add "New Tag" 12345 --create-missing      # create then tag
-uv run python -m mailbox tags remove "Volunteers" 12345
+mailbox tags add "Volunteers" 12345 ada@flip.museum
+mailbox tags add "Volunteers" --from-status active --dry-run
+mailbox tags add "Volunteers" --all --dry-run         # everyone (preview)
+mailbox tags add "Volunteers" --from-file emails.txt   # '-' = stdin
+mailbox tags add "New Tag" 12345 --create-missing      # create then tag
+mailbox tags remove "Volunteers" 12345
 ```
 
 Mutating commands are deliberately careful: pass `--dry-run` to preview, and they
@@ -80,7 +90,7 @@ ID          EMAIL                 NAME   STATE
 You can also drive the client library directly:
 
 ```bash
-uv run python -c "from mailbox.kit import KitClient; print(KitClient().get_subscriber(1))"
+uv run python -c "from flipmail.kit import KitClient; print(KitClient().get_subscriber(1))"
 ```
 
 ## Documentation

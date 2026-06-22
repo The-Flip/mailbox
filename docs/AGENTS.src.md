@@ -181,9 +181,11 @@ See [`docs/Architecture.md`](docs/Architecture.md) for detail.
 ## Project Structure
 
 ```text
-mailbox/
-├── mailbox/                # The application package
+mailbox/                    # repo root (distribution & command are named "mailbox")
+├── flipmail/               # The application package (imported as `flipmail`)
+│   ├── cli.py              # Click CLI — entry point for the `mailbox` command
 │   ├── config.py           # Environment-backed settings (KIT_API_KEY, etc.)
+│   ├── tags.py             # Tag workflows (resolve, select, apply)
 │   └── kit/                # Kit v4 API client
 │       ├── client.py       # KitClient — thin, typed wrapper over httpx
 │       └── errors.py       # KitAPIError and friends
@@ -194,9 +196,11 @@ mailbox/
 
 See [`docs/Project_Structure.md`](docs/Project_Structure.md) for the full conventions.
 
-> Note: the importable package is named `mailbox`, which shadows Python's stdlib
-> `mailbox` module on the import path. We don't use the stdlib module here, but be
-> aware of it when adding imports.
+> Note: the import package is `flipmail`, not `mailbox` — a top-level `mailbox`
+> package would be shadowed by Python's stdlib `mailbox` module on `sys.path`,
+> breaking the installed `mailbox` command. The distribution and the CLI command
+> stay named `mailbox`; only the import name is `flipmail`. Import from
+> `flipmail`, run the tool as `mailbox` (or `python -m flipmail`).
 
 ## Rules to Always Follow
 
@@ -205,7 +209,7 @@ Always follow these rules (full detail in [`docs/Python.md`](docs/Python.md)):
 - **Always use latest stable versions**: When adding a dependency, pre-commit hook, or tool, verify and use the latest stable version. Check PyPI / the package's source before pinning. Don't guess versions from memory. Manage dependencies with `uv add` / `uv add --dev`, not by hand-editing `pyproject.toml`.
 - **Don't silence linter/type warnings**: don't add `# noqa`, `# type: ignore`, or similar without explicit user approval. Fix the underlying issue instead; if fixing looks complicated, ask.
 - **Secrets**: never hardcode keys, passwords, or tokens.
-  - Read them from the environment via `python-decouple` (see `mailbox/config.py`).
+  - Read them from the environment via `python-decouple` (see `flipmail/config.py`).
   - When tests need keys or tokens, generate them dynamically (`secrets.token_hex(16)`) to avoid tripping the `detect-secrets` hook.
 - **Email safety**: any operation that sends mail or mutates subscribers in Kit must be deliberate, idempotent where possible, and easy to dry-run. Prefer explicit confirmation for destructive or send operations. Never send to a live list "to test."
 - **Respect Kit rate limits**: API-key auth allows 120 requests / rolling 60s (OAuth: 600). Build in backoff/retry for `429`s rather than hammering the API.

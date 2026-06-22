@@ -4,8 +4,8 @@ Mailbox is a small Python application that manages The Flip's mailing lists thro
 
 ## Components
 
-- **`mailbox.config`** — Loads configuration and secrets from the environment (via `python-decouple`). The single place that knows about `KIT_API_KEY`, base URL, timeouts, etc. Nothing else reads `os.environ` directly.
-- **`mailbox.kit`** — The Kit API client.
+- **`flipmail.config`** — Loads configuration and secrets from the environment (via `python-decouple`). The single place that knows about `KIT_API_KEY`, base URL, timeouts, etc. Nothing else reads `os.environ` directly.
+- **`flipmail.kit`** — The Kit API client.
   - `client.py` — `KitClient`, a thin, typed wrapper over an `httpx.Client`. Owns auth headers, base URL, timeout, retry/backoff for transient errors, and cursor-based pagination. All Kit access goes through here.
   - `errors.py` — Exception hierarchy (`KitAPIError` and subclasses) so callers can handle failures precisely instead of catching bare `Exception`.
 - **Task/command modules** (added as the project grows) — Higher-level operations that compose `KitClient` calls into mailing-list workflows (e.g. import subscribers, tag a segment, schedule a broadcast). These hold the business logic and the safety rails.

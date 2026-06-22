@@ -29,7 +29,7 @@ Compare new/modified code against documented patterns:
 
 **For Kit API access:**
 
-- All HTTP to Kit goes through `mailbox/kit/client.py` (no `httpx` calls elsewhere)
+- All HTTP to Kit goes through `flipmail/kit/client.py` (no `httpx` calls elsewhere)
 - Auth header is `X-Kit-Api-Key` (or OAuth bearer); base URL from config, not hardcoded
 - Rate-limit/`429` handling with backoff per `docs/KitAPI.md`
 - Pagination walks cursors transparently rather than leaking them to callers
@@ -37,7 +37,7 @@ Compare new/modified code against documented patterns:
 
 **For configuration/secrets:**
 
-- Secrets read only in `mailbox/config.py`, via `python-decouple`; nothing hardcoded
+- Secrets read only in `flipmail/config.py`, via `python-decouple`; nothing hardcoded
 - `.env.example` updated when a new env var is introduced
 
 **For Python conventions:**

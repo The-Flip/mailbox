@@ -9,7 +9,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from mailbox.kit import (
+from flipmail.kit import (
     KitAuthError,
     KitClient,
     KitNotFoundError,

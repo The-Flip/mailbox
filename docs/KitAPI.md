@@ -22,7 +22,7 @@ Pass the key in a request header on every call:
 X-Kit-Api-Key: <your key>
 ```
 
-Create a V4 API key in your Kit account under **Settings → Developer**. Store it as `KIT_API_KEY` in `.env` (never hardcode it). `mailbox/config.py` is the only place that reads it.
+Create a V4 API key in your Kit account under **Settings → Developer**. Store it as `KIT_API_KEY` in `.env` (never hardcode it). `flipmail/config.py` is the only place that reads it.
 
 ### OAuth (only for a public integration)
 
@@ -79,7 +79,7 @@ Tags are how we segment subscribers. The endpoints we use (all via `KitClient`):
 
 ### Bulk: why we loop instead of using `/v4/bulk/*`
 
-Kit's true bulk endpoints (`POST`/`DELETE /v4/bulk/tags/subscribers`, ≤100 taggings sync / async above) **require OAuth and reject API-key auth**. This project authenticates with an API key, so "bulk" tag operations are implemented by **looping the per-subscriber endpoints** with rate-limit backoff (see `mailbox/tags.py::apply_tag`). That keeps us within the 120 req/60s API-key limit at the cost of speed. The loop engine returns a `{successes, failures}` result shaped like Kit's bulk response, so a future OAuth-backed bulk path can replace just that function without changing the CLI.
+Kit's true bulk endpoints (`POST`/`DELETE /v4/bulk/tags/subscribers`, ≤100 taggings sync / async above) **require OAuth and reject API-key auth**. This project authenticates with an API key, so "bulk" tag operations are implemented by **looping the per-subscriber endpoints** with rate-limit backoff (see `flipmail/tags.py::apply_tag`). That keeps us within the 120 req/60s API-key limit at the cost of speed. The loop engine returns a `{successes, failures}` result shaped like Kit's bulk response, so a future OAuth-backed bulk path can replace just that function without changing the CLI.
 
 ## Safety
 
@@ -95,7 +95,7 @@ When in doubt about a send/mutation, stop and confirm with a human first.
 
 ## Errors
 
-Map HTTP failures to the `KitAPIError` hierarchy in `mailbox/kit/errors.py` so callers can handle them precisely:
+Map HTTP failures to the `KitAPIError` hierarchy in `flipmail/kit/errors.py` so callers can handle them precisely:
 
 - `4xx` → client errors (bad request, auth, not found). Surface Kit's error message.
 - `429` → rate-limited; carries retry timing.

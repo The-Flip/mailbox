@@ -10,7 +10,8 @@ This guide enables AI coding agents to work productively in this codebase. Follo
 
 ## Project Structure
 
-- `mailbox/` — the application package
+- `flipmail/` — the application package (imported as `flipmail`; the command is `mailbox`)
+  - `cli.py` — Click CLI, entry point for the `mailbox` command
   - `config.py` — the only reader of environment variables (`KIT_API_KEY`, base URL, timeouts)
   - `kit/client.py` — `KitClient`, the single boundary to the Kit API (auth, retries, pagination)
   - `kit/errors.py` — `KitAPIError` hierarchy
@@ -20,8 +21,8 @@ This guide enables AI coding agents to work productively in this codebase. Follo
 
 ## Conventions
 
-- All Kit HTTP goes through `mailbox/kit/client.py`. Never call `httpx` elsewhere.
-- All secrets/config come from `mailbox/config.py` via `python-decouple`. Never hardcode keys; keep `.env.example` in sync.
+- All Kit HTTP goes through `flipmail/kit/client.py`. Never call `httpx` elsewhere.
+- All secrets/config come from `flipmail/config.py` via `python-decouple`. Never hardcode keys; keep `.env.example` in sync.
 - Auth header is `X-Kit-Api-Key`. Base URL: `https://api.kit.com/v4`. Rate limit: 120 req / rolling 60s (API key).
 - Raise specific `KitAPIError` subclasses; never swallow errors in a bare `except`.
 - Add dependencies with `uv add` / `uv add --dev`, latest stable. Don't add `# noqa` / `# type: ignore` without approval.

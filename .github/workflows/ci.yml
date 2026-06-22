@@ -64,7 +64,7 @@ jobs:
         run: uv run ruff check .
 
       - name: Run type checking
-        run: uv run mypy mailbox
+        run: uv run mypy flipmail
 
       # Slower checks last
       - name: Run tests

@@ -13,6 +13,25 @@ dependencies = [
     "python-decouple>=3.8",
 ]
 
+# The `mailbox` command. After `uv sync` it lives at `.venv/bin/mailbox`
+# (run via `uv run mailbox`); `uv tool install --editable .` puts it on PATH so
+# you can type `mailbox` anywhere. See README.
+#
+# The import package is `flipmail`, not `mailbox`, to avoid shadowing Python's
+# stdlib `mailbox` module — an installed top-level `mailbox` package is masked by
+# the stdlib on sys.path, which would break the command.
+[project.scripts]
+mailbox = "flipmail.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Distribution is named "mailbox" but the package dir is "flipmail", so point
+# hatchling at it explicitly.
+[tool.hatch.build.targets.wheel]
+packages = ["flipmail"]
+
 [dependency-groups]
 # Installed with `uv sync` (default); skip with `uv sync --no-dev`.
 dev = [
@@ -23,11 +42,6 @@ dev = [
     "pre-commit>=4.5",
     "detect-secrets>=1.5",
 ]
-
-[tool.uv]
-# This is an application, not a distributable library — don't try to build/install
-# the `mailbox` package itself. Tests import it via `pythonpath` (see pytest config).
-package = false
 
 [tool.ruff]
 target-version = "py314"
@@ -69,7 +83,7 @@ ignore = [
 "scripts/*.py" = ["T201"]                # allow print in build/CLI scripts
 
 [tool.ruff.lint.isort]
-known-first-party = ["mailbox"]
+known-first-party = ["flipmail"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 
 [tool.ruff.format]
@@ -96,7 +110,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["mailbox"]
+source = ["flipmail"]
 omit = ["tests/*", "*/__pycache__/*", ".venv/*"]
 
 [tool.coverage.report]

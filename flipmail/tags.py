@@ -1,6 +1,6 @@
 """Tag workflows: resolving tag names, selecting subscribers, and applying tags.
 
-This is the workflow layer above :class:`mailbox.kit.client.KitClient` (which is
+This is the workflow layer above :class:`flipmail.kit.client.KitClient` (which is
 pure HTTP transport). It holds the business logic and the safety-relevant
 accounting for tag operations.
 
@@ -19,7 +19,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
-from mailbox.kit import KitAPIError, KitClient
+from flipmail.kit import KitAPIError, KitClient
 
 TagAction = Literal["add", "remove"]
 
