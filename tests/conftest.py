@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Callable
+from typing import Any
 
 import httpx
 import pytest
@@ -29,12 +30,12 @@ def make_client() -> Callable[..., KitClient]:
     any other KitClient kwargs (e.g. ``max_retries``, ``backoff_base``).
     """
 
-    def _make(handler: Handler, **kwargs: object) -> KitClient:
+    def _make(handler: Handler, **kwargs: Any) -> KitClient:
         return KitClient(
             TEST_KEY,
             base_url="https://api.kit.com/v4",
             transport=httpx.MockTransport(handler),
-            **kwargs,  # type: ignore[arg-type]
+            **kwargs,
         )
 
     return _make

@@ -55,7 +55,9 @@ uv run python -m mailbox tags create "Volunteers"     # idempotent
 # TAG is a tag name (resolved for you) or a numeric tag id.
 uv run python -m mailbox tags add "Volunteers" 12345 ada@flip.museum
 uv run python -m mailbox tags add "Volunteers" --from-status active --dry-run
+uv run python -m mailbox tags add "Volunteers" --all --dry-run         # everyone (preview)
 uv run python -m mailbox tags add "Volunteers" --from-file emails.txt   # '-' = stdin
+uv run python -m mailbox tags add "New Tag" 12345 --create-missing      # create then tag
 uv run python -m mailbox tags remove "Volunteers" 12345
 ```
 

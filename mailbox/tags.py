@@ -164,9 +164,11 @@ def apply_tag(
             if action == "add":
                 client.add_tag(tag_id, subscriber_id=target.subscriber_id, email=target.email)
                 result.successes.append(ItemResult(target, True, "tagged"))
-            else:
+            elif action == "remove":
                 client.remove_tag(tag_id, subscriber_id=target.subscriber_id, email=target.email)
                 result.successes.append(ItemResult(target, True, "untagged"))
+            else:  # defensive: never silently fall through to a destructive default
+                raise ValueError(f"Unsupported tag action {action!r}; expected 'add' or 'remove'.")
         except KitAPIError as err:
             result.failures.append(ItemResult(target, False, str(err)))
     return result

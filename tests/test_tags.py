@@ -5,6 +5,8 @@ Uses the ``make_client`` fixture (mock transport) from conftest — hermetic.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, cast
+
 import httpx
 import pytest
 
@@ -16,6 +18,9 @@ from mailbox.tags import (
     parse_target,
     resolve_tag,
 )
+
+if TYPE_CHECKING:
+    from mailbox.tags import TagAction
 
 
 def _tags_response(tags: list[dict]) -> httpx.Response:
@@ -127,6 +132,13 @@ def test_apply_tag_records_failures_and_continues(make_client):
     assert len(result.successes) == 2
     assert len(result.failures) == 1
     assert result.failures[0].target.subscriber_id == 2
+
+
+def test_apply_tag_rejects_unknown_action(make_client):
+    """An unexpected action raises instead of silently removing tags."""
+    with make_client(lambda r: httpx.Response(200)) as client:
+        with pytest.raises(ValueError, match="Unsupported tag action"):
+            apply_tag(client, 5, [Target(subscriber_id=1)], action=cast("TagAction", "sync"))
 
 
 def test_apply_tag_remove(make_client):
