@@ -62,7 +62,7 @@ lint:
 
 .PHONY: typecheck
 typecheck:
-	$(UV) mypy mailbox
+	$(UV) mypy flipmail
 
 .PHONY: quality
 quality: lint typecheck

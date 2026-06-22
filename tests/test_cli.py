@@ -9,7 +9,7 @@ from __future__ import annotations
 import httpx
 from click.testing import CliRunner
 
-from mailbox import cli as cli_module
+from flipmail import cli as cli_module
 
 # -- subscribers list ------------------------------------------------------
 

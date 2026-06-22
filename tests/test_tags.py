@@ -1,4 +1,4 @@
-"""Tests for the tag workflow layer (mailbox/tags.py).
+"""Tests for the tag workflow layer (flipmail/tags.py).
 
 Uses the ``make_client`` fixture (mock transport) from conftest — hermetic.
 """
@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, cast
 import httpx
 import pytest
 
-from mailbox.tags import (
+from flipmail.tags import (
     TagResolutionError,
     Target,
     apply_tag,
@@ -20,7 +20,7 @@ from mailbox.tags import (
 )
 
 if TYPE_CHECKING:
-    from mailbox.tags import TagAction
+    from flipmail.tags import TagAction
 
 
 def _tags_response(tags: list[dict]) -> httpx.Response:

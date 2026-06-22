@@ -13,8 +13,8 @@ from typing import Any
 import httpx
 import pytest
 
-from mailbox import cli as cli_module
-from mailbox.kit import KitClient
+from flipmail import cli as cli_module
+from flipmail.kit import KitClient
 
 # A throwaway key generated per-run so detect-secrets never sees a literal.
 TEST_KEY = secrets.token_hex(16)

@@ -1,16 +1,19 @@
 # Project Structure
 
 ```text
-mailbox/
-├── mailbox/                # The application package (importable as `mailbox`)
+mailbox/                    # repo root (distribution & command are named "mailbox")
+├── flipmail/               # The application package (imported as `flipmail`)
 │   ├── __init__.py
+│   ├── __main__.py         # `python -m flipmail`
+│   ├── cli.py              # Click CLI — entry point for the `mailbox` command
 │   ├── config.py           # Environment-backed settings — the only reader of env vars
+│   ├── tags.py             # Tag workflows (resolve, select, apply)
 │   └── kit/                # Kit v4 API client
 │       ├── __init__.py
 │       ├── client.py       # KitClient: typed wrapper over httpx
 │       └── errors.py       # KitAPIError hierarchy
 ├── tests/                  # pytest suite (mocks HTTP; no live calls by default)
-│   ├── __init__.py
+│   ├── conftest.py
 │   └── test_client.py
 ├── scripts/                # Dev/build scripts
 │   ├── build_agent_docs.py     # Generates CLAUDE.md / AGENTS.md from docs/AGENTS.src.md
@@ -24,15 +27,21 @@ mailbox/
 └── Makefile                # Common commands (wrap `uv run ...`)
 ```
 
+> **Why `flipmail`, not `mailbox`?** The import package is `flipmail` to avoid
+> colliding with Python's stdlib `mailbox` module. An installed top-level package
+> named `mailbox` is shadowed by the stdlib on `sys.path`, which would break the
+> `mailbox` console command. The distribution and the command stay named
+> `mailbox`; only the Python import name is `flipmail`.
+
 ## Conventions
 
 - **Where code goes**
-  - Anything that talks to Kit over HTTP lives under `mailbox/kit/`. Don't make HTTP calls elsewhere.
-  - Configuration and secret access lives in `mailbox/config.py`. Don't read `os.environ` or `decouple.config` anywhere else.
+  - Anything that talks to Kit over HTTP lives under `flipmail/kit/`. Don't make HTTP calls elsewhere.
+  - Configuration and secret access lives in `flipmail/config.py`. Don't read `os.environ` or `decouple.config` anywhere else.
   - Reusable helpers shared across modules get their own module — never dump them in `__init__.py`.
-  - Higher-level mailing-list workflows get their own module(s) under `mailbox/` (e.g. `mailbox/lists.py`, `mailbox/broadcasts.py`) as they appear.
+  - Higher-level mailing-list workflows get their own module(s) under `flipmail/` (e.g. `flipmail/lists.py`, `flipmail/broadcasts.py`) as they appear.
 - **One responsibility per module.** Keep `client.py` about HTTP/transport concerns; keep business logic and safety checks in the workflow modules that call it.
-- **Tests mirror the package.** A module `mailbox/kit/client.py` is tested by `tests/test_client.py`. Tests never hit the live API unless marked `@pytest.mark.integration` (see [Testing.md](Testing.md)).
+- **Tests mirror the package.** A module `flipmail/kit/client.py` is tested by `tests/test_client.py`. Tests never hit the live API unless marked `@pytest.mark.integration` (see [Testing.md](Testing.md)).
 - **Scripts are not part of the package.** Files in `scripts/` are standalone (run via `uv run python scripts/...`) and may use `print`.
 
 ## Generated files

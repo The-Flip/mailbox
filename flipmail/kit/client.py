@@ -1,7 +1,7 @@
 """A thin, typed client for the Kit (kit.com) v4 API.
 
 This is the single boundary between this app and Kit. It owns authentication,
-the base URL, timeouts, and mapping HTTP failures to the :mod:`mailbox.kit.errors`
+the base URL, timeouts, and mapping HTTP failures to the :mod:`flipmail.kit.errors`
 hierarchy. Keep transport concerns here; put mailing-list workflows and safety
 checks in the modules that call this client.
 
@@ -20,8 +20,8 @@ from typing import Any
 
 import httpx
 
-from mailbox import config
-from mailbox.kit.errors import (
+from flipmail import config
+from flipmail.kit.errors import (
     KitAPIError,
     KitAuthError,
     KitClientError,
@@ -113,7 +113,7 @@ class KitClient:
         operations like sends, where a blind retry could double-send (see
         ``docs/KitAPI.md``). Tag operations are idempotent, so they retry safely.
 
-        Raises a :class:`~mailbox.kit.errors.KitAPIError` subclass on a non-2xx
+        Raises a :class:`~flipmail.kit.errors.KitAPIError` subclass on a non-2xx
         response that is not retried (or once retries are exhausted).
         """
         attempt = 0

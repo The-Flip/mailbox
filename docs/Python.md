@@ -13,7 +13,7 @@ Coding rules for this project. These complement the always-loaded rules in [`CLA
 
 ## Secrets & configuration
 
-- **Never hardcode keys, tokens, or passwords.** Read them from the environment via `python-decouple`, and do it only in `mailbox/config.py`. Everything else imports from there.
+- **Never hardcode keys, tokens, or passwords.** Read them from the environment via `python-decouple`, and do it only in `flipmail/config.py`. Everything else imports from there.
 - In tests, generate any needed secrets dynamically (`secrets.token_hex(16)`) so the `detect-secrets` pre-commit hook doesn't flag a committed literal.
 - `.env` is git-ignored. `.env.example` documents every variable the app reads — keep it in sync when you add config.
 
@@ -32,7 +32,7 @@ Coding rules for this project. These complement the always-loaded rules in [`CLA
 ## Error handling
 
 - **Fail fast and loud.** Raise specific exceptions with useful messages rather than returning `None` or swallowing errors.
-- For Kit API failures, raise from the `KitAPIError` hierarchy (`mailbox/kit/errors.py`) so callers can handle precisely. Never catch bare `except:` / `except Exception` to hide a problem.
+- For Kit API failures, raise from the `KitAPIError` hierarchy (`flipmail/kit/errors.py`) so callers can handle precisely. Never catch bare `except:` / `except Exception` to hide a problem.
 - Use `raise ... from err` to preserve the cause when re-raising.
 
 ## Class design
@@ -43,6 +43,6 @@ Coding rules for this project. These complement the always-loaded rules in [`CLA
 
 ## HTTP / API client
 
-- All Kit access goes through `mailbox/kit/client.py`. See [KitAPI.md](KitAPI.md) for the API specifics (auth, pagination, rate limits, safety).
+- All Kit access goes through `flipmail/kit/client.py`. See [KitAPI.md](KitAPI.md) for the API specifics (auth, pagination, rate limits, safety).
 - Build in retry/backoff for transient errors (`429`, `5xx`). Don't hammer the API on failure.
 - Prefer small, explicit methods over a generic `request()` escape hatch leaking `httpx` to callers.

@@ -1,8 +1,8 @@
 """Command-line interface for Mailbox.
 
-Run it with::
+Run it with the installed ``mailbox`` command (or ``uv run mailbox`` in the repo)::
 
-    uv run python -m mailbox --help
+    mailbox --help
 
 Read commands (``subscribers list``, ``tags list``) are always safe. Mutating
 commands (``tags add`` / ``tags remove``) follow the safety rules in
@@ -18,10 +18,10 @@ from typing import Any
 
 import click
 
-from mailbox import __version__
-from mailbox import tags as tags_workflow
-from mailbox.kit import KitAPIError, KitClient
-from mailbox.tags import TagResolutionError
+from flipmail import __version__
+from flipmail import tags as tags_workflow
+from flipmail.kit import KitAPIError, KitClient
+from flipmail.tags import TagResolutionError
 
 #: Subscriber states Kit recognizes, used by --status options.
 SUBSCRIBER_STATES = ["active", "inactive", "bounced", "cancelled", "complained"]
@@ -347,7 +347,7 @@ def _print_table(headers: tuple[str, ...], rows: Sequence[tuple[str, ...]]) -> N
 
 
 def main() -> None:
-    """Entry point used by ``python -m mailbox``."""
+    """Entry point for the ``mailbox`` command (and ``python -m flipmail``)."""
     cli()
 
 
