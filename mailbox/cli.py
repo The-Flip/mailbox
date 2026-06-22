@@ -13,7 +13,8 @@ commands (``tags add`` / ``tags remove``) follow the safety rules in
 from __future__ import annotations
 
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
 
 import click
 
@@ -156,7 +157,7 @@ def create_tag(name: str) -> None:
     click.echo(f"Tag {tag.get('name')!r} (id {tag.get('id')}).")
 
 
-def _selector_options(func):  # type: ignore[no-untyped-def]
+def _selector_options(func: Callable[..., Any]) -> Callable[..., Any]:
     """Shared subscriber-selector + safety options for add/remove commands."""
     func = click.argument("subscribers", nargs=-1)(func)
     func = click.option(
