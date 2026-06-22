@@ -25,3 +25,8 @@ KIT_API_TIMEOUT: float = config("KIT_API_TIMEOUT", default=30, cast=float)
 
 #: How many times to retry transient failures (429 / 5xx) before giving up.
 KIT_API_MAX_RETRIES: int = config("KIT_API_MAX_RETRIES", default=3, cast=int)
+
+#: Base delay (seconds) for exponential backoff between retries. The nth retry
+#: waits ``KIT_API_BACKOFF_BASE * 2**n`` seconds, unless the response carried a
+#: ``Retry-After`` header (which takes precedence).
+KIT_API_BACKOFF_BASE: float = config("KIT_API_BACKOFF_BASE", default=0.5, cast=float)

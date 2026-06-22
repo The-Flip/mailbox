@@ -60,7 +60,26 @@ The v4 API covers (non-exhaustive — check the reference):
 - **Sequences** (email courses) — enroll/list subscribers.
 - **Broadcasts** — one-off emails to a segment; compose and send.
 - **Forms** — subscription forms and their subscribers.
-- **Bulk requests & async processing** — v4 supports bulk operations for large changes; prefer these over many single calls when changing lots of records.
+- **Bulk requests & async processing** — v4 supports bulk operations for large changes. **These require OAuth and reject API-key auth** (see below).
+
+## Tags
+
+Tags are how we segment subscribers. The endpoints we use (all via `KitClient`):
+
+| Operation                  | Method & path                            | Notes                                                                                   |
+| -------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------- |
+| List tags                  | `GET /tags`                              | Cursor-paginated; each tag has `id`, `name`, `subscriber_count`.                        |
+| List a subscriber's tags   | `GET /subscribers/{id}/tags`             | Tags include `tagged_at`.                                                               |
+| Subscribers **with** tags  | `GET /subscribers?include=tags`          | Tags inline (`id`, `name`) — one sweep, no N+1.                                         |
+| Create a tag               | `POST /tags` `{"name": ...}`             | Idempotent: 200 if the name already exists.                                             |
+| Add tag to subscriber      | `POST /tags/{tag_id}/subscribers/{id}`   | Or `.../subscribers` with `{"email_address": ...}`. Idempotent (200 if already tagged). |
+| Remove tag from subscriber | `DELETE /tags/{tag_id}/subscribers/{id}` | Returns `204`. Email variant mirrors add.                                               |
+
+**Adding a tag can trigger automations.** In Kit, tags commonly trigger automations/sequences that send email. Treat `add_tag` as a sending operation: dry-run first, confirm, and never tag a live segment "to test." See [Safety](#safety).
+
+### Bulk: why we loop instead of using `/v4/bulk/*`
+
+Kit's true bulk endpoints (`POST`/`DELETE /v4/bulk/tags/subscribers`, ≤100 taggings sync / async above) **require OAuth and reject API-key auth**. This project authenticates with an API key, so "bulk" tag operations are implemented by **looping the per-subscriber endpoints** with rate-limit backoff (see `mailbox/tags.py::apply_tag`). That keeps us within the 120 req/60s API-key limit at the cost of speed. The loop engine returns a `{successes, failures}` result shaped like Kit's bulk response, so a future OAuth-backed bulk path can replace just that function without changing the CLI.
 
 ## Safety
 

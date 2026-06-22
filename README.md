@@ -42,7 +42,28 @@ uv run python -m mailbox --help
 uv run python -m mailbox subscribers list             # first 20 subscribers
 uv run python -m mailbox subscribers list --status active --limit 50
 uv run python -m mailbox subscribers list --all       # walk every page
+uv run python -m mailbox subscribers list --tags      # include each subscriber's tags
 ```
+
+### Tags
+
+```bash
+uv run python -m mailbox tags list                    # the account's tags
+uv run python -m mailbox tags create "Volunteers"     # idempotent
+
+# Add/remove a tag, by id or email, individually or in bulk.
+# TAG is a tag name (resolved for you) or a numeric tag id.
+uv run python -m mailbox tags add "Volunteers" 12345 ada@flip.museum
+uv run python -m mailbox tags add "Volunteers" --from-status active --dry-run
+uv run python -m mailbox tags add "Volunteers" --from-file emails.txt   # '-' = stdin
+uv run python -m mailbox tags remove "Volunteers" 12345
+```
+
+Mutating commands are deliberately careful: pass `--dry-run` to preview, and they
+ask for confirmation unless you pass `--yes`. **Adding a tag can trigger Kit
+automations and send email**, so it can't be undone — preview first. Bulk runs
+loop one API call per subscriber (API keys can't use Kit's bulk endpoints), so
+large batches are rate-limited to ~120/min and take a while.
 
 Example output:
 

@@ -1,38 +1,17 @@
 """Tests for the Click CLI.
 
-The CLI builds a ``KitClient()`` with no args, so we patch that constructor to
-return one wired to a mock transport — no network, no real key.
+The ``patched_client`` fixture (conftest) monkeypatches cli.KitClient to use a
+mock transport, so the CLI runs end-to-end with no network or real key.
 """
 
 from __future__ import annotations
 
-import secrets
-
 import httpx
-import pytest
 from click.testing import CliRunner
 
 from mailbox import cli as cli_module
-from mailbox.kit import KitClient
 
-TEST_KEY = secrets.token_hex(16)
-
-
-@pytest.fixture
-def patched_client(monkeypatch):
-    """Patch cli.KitClient so it uses a mock transport with the given handler."""
-
-    def install(handler):
-        def factory(*_args, **_kwargs):
-            return KitClient(
-                TEST_KEY,
-                base_url="https://api.kit.com/v4",
-                transport=httpx.MockTransport(handler),
-            )
-
-        monkeypatch.setattr(cli_module, "KitClient", factory)
-
-    return install
+# -- subscribers list ------------------------------------------------------
 
 
 def test_list_subscribers_renders_table(patched_client):
@@ -65,6 +44,33 @@ def test_list_subscribers_renders_table(patched_client):
     assert "ada@flip.museum" in result.output
     assert "grace@flip.museum" in result.output
     assert "2 subscriber(s)." in result.output
+
+
+def test_list_subscribers_with_tags_column(patched_client):
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["include"] == "tags"
+        return httpx.Response(
+            200,
+            json={
+                "subscribers": [
+                    {
+                        "id": 1,
+                        "email_address": "ada@flip.museum",
+                        "first_name": "Ada",
+                        "state": "active",
+                        "tags": [{"id": 1, "name": "VIP"}, {"id": 2, "name": "Volunteer"}],
+                    }
+                ],
+                "pagination": {"has_next_page": False},
+            },
+        )
+
+    patched_client(handler)
+    result = CliRunner().invoke(cli_module.cli, ["subscribers", "list", "--tags"])
+
+    assert result.exit_code == 0, result.output
+    assert "TAGS" in result.output
+    assert "VIP, Volunteer" in result.output
 
 
 def test_limit_caps_results(patched_client):
@@ -107,3 +113,190 @@ def test_empty_list(patched_client):
 
     assert result.exit_code == 0, result.output
     assert "No subscribers found." in result.output
+
+
+# -- tags list / create ----------------------------------------------------
+
+
+def test_tags_list_renders_catalog(patched_client):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "tags": [{"id": 1, "name": "VIP", "subscriber_count": 12}],
+                "pagination": {"has_next_page": False},
+            },
+        )
+
+    patched_client(handler)
+    result = CliRunner().invoke(cli_module.cli, ["tags", "list"])
+
+    assert result.exit_code == 0, result.output
+    assert "VIP" in result.output
+    assert "12" in result.output
+    assert "1 tag(s)." in result.output
+
+
+def test_tags_create(patched_client):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(201, json={"tag": {"id": 9, "name": "Newsletter"}})
+
+    patched_client(handler)
+    result = CliRunner().invoke(cli_module.cli, ["tags", "create", "Newsletter"])
+
+    assert result.exit_code == 0, result.output
+    assert "Newsletter" in result.output
+    assert "9" in result.output
+
+
+# -- tags add / remove -----------------------------------------------------
+
+
+def test_tags_add_dry_run_makes_no_mutations(patched_client):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path == "/v4/tags":
+            return httpx.Response(
+                200,
+                json={"tags": [{"id": 5, "name": "VIP"}], "pagination": {"has_next_page": False}},
+            )
+        raise AssertionError(f"dry-run must not mutate; saw {request.method} {request.url.path}")
+
+    patched_client(handler)
+    result = CliRunner().invoke(cli_module.cli, ["tags", "add", "VIP", "1", "2", "--dry-run"])
+
+    assert result.exit_code == 0, result.output
+    assert "dry-run" in result.output
+    assert "2 subscriber(s)" in result.output
+
+
+def test_tags_add_requires_confirmation(patched_client):
+    """Without --yes, answering 'n' aborts before any mutation."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path == "/v4/tags":
+            return httpx.Response(
+                200,
+                json={"tags": [{"id": 5, "name": "VIP"}], "pagination": {"has_next_page": False}},
+            )
+        raise AssertionError("must not mutate when the user declines")
+
+    patched_client(handler)
+    result = CliRunner().invoke(cli_module.cli, ["tags", "add", "VIP", "1"], input="n\n")
+
+    assert result.exit_code != 0  # click abort
+    assert "automations" in result.output  # warning shown
+
+
+def test_tags_add_yes_skips_confirm_and_reports_summary(patched_client):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v4/tags":
+            return httpx.Response(
+                200,
+                json={"tags": [{"id": 5, "name": "VIP"}], "pagination": {"has_next_page": False}},
+            )
+        return httpx.Response(201, json={"subscriber": {"id": 1}})
+
+    patched_client(handler)
+    result = CliRunner().invoke(cli_module.cli, ["tags", "add", "VIP", "1", "--yes"])
+
+    assert result.exit_code == 0, result.output
+    assert "1 tagged, 0 failed." in result.output
+
+
+def test_tags_add_by_id_uses_create_missing(patched_client):
+    """--create-missing creates the tag when the name doesn't resolve."""
+    posted: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v4/tags" and request.method == "GET":
+            return httpx.Response(200, json={"tags": [], "pagination": {"has_next_page": False}})
+        if request.url.path == "/v4/tags" and request.method == "POST":
+            posted.append("created")
+            return httpx.Response(201, json={"tag": {"id": 77, "name": "Fresh"}})
+        return httpx.Response(201, json={"subscriber": {"id": 1}})
+
+    patched_client(handler)
+    result = CliRunner().invoke(
+        cli_module.cli, ["tags", "add", "Fresh", "1", "--create-missing", "--yes"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert posted == ["created"]
+    assert "1 tagged" in result.output
+
+
+def test_tags_remove_reports_summary(patched_client):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v4/tags":
+            return httpx.Response(
+                200,
+                json={"tags": [{"id": 5, "name": "VIP"}], "pagination": {"has_next_page": False}},
+            )
+        return httpx.Response(204)
+
+    patched_client(handler)
+    result = CliRunner().invoke(cli_module.cli, ["tags", "remove", "VIP", "1", "--yes"])
+
+    assert result.exit_code == 0, result.output
+    assert "1 untagged, 0 failed." in result.output
+
+
+def test_tags_add_from_stdin(patched_client):
+    """--from-file - reads ids/emails from stdin."""
+    tagged: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v4/tags":
+            return httpx.Response(
+                200,
+                json={"tags": [{"id": 5, "name": "VIP"}], "pagination": {"has_next_page": False}},
+            )
+        tagged.append(request.url.path)
+        return httpx.Response(201, json={"subscriber": {}})
+
+    patched_client(handler)
+    result = CliRunner().invoke(
+        cli_module.cli,
+        ["tags", "add", "VIP", "--from-file", "-", "--yes"],
+        input="1\n2\n# comment\n\n3\n",
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "3 tagged" in result.output
+    assert len(tagged) == 3
+
+
+def test_tags_add_no_selection_errors(patched_client):
+    patched_client(lambda r: httpx.Response(200))
+    result = CliRunner().invoke(cli_module.cli, ["tags", "add", "VIP"])
+
+    assert result.exit_code != 0
+    assert "No subscribers selected" in result.output
+
+
+def test_tags_add_failure_exits_nonzero(patched_client):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v4/tags":
+            return httpx.Response(
+                200,
+                json={"tags": [{"id": 5, "name": "VIP"}], "pagination": {"has_next_page": False}},
+            )
+        return httpx.Response(404, json={"errors": ["not found"]})
+
+    patched_client(handler)
+    result = CliRunner().invoke(cli_module.cli, ["tags", "add", "VIP", "999", "--yes"])
+
+    assert result.exit_code != 0
+    assert "0 tagged, 1 failed." in result.output
+    assert "Failures:" in result.output
+
+
+def test_tags_unknown_name_reported_cleanly(patched_client):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"tags": [], "pagination": {"has_next_page": False}})
+
+    patched_client(handler)
+    result = CliRunner().invoke(cli_module.cli, ["tags", "add", "Ghost", "1", "--yes"])
+
+    assert result.exit_code != 0
+    assert "No tag named" in result.output
