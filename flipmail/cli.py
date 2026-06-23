@@ -222,7 +222,12 @@ def remove_tag_command(
     dry_run: bool,
     assume_yes: bool,
 ) -> None:
-    """Remove TAG from the selected subscribers (by id, email, --from-status, or --all)."""
+    """Remove TAG from the selected subscribers (by id, email, --from-status, or --all).
+
+    --all and --from-status only touch subscribers who actually have TAG (looked
+    up via the tag's subscriber list), so a bulk untag costs one call per holder,
+    not one per subscriber in the account.
+    """
     _run_tag_mutation(
         action="remove",
         tag_ref=tag_ref,
@@ -259,12 +264,19 @@ def _run_tag_mutation(
 
     try:
         with KitClient() as client:
+            # Resolve the tag first: `remove` scopes its segment selectors to
+            # this tag's holders (so --all only touches tagged subscribers).
+            tag = tags_workflow.resolve_tag(client, tag_ref, create_missing=create_missing)
+            tag_id = int(str(tag["id"]))
+            tag_label = tag.get("name") or f"id {tag.get('id')}"
+
             try:
                 targets = tags_workflow.collect_targets(
                     client,
                     tokens=tokens,
                     from_status=from_status,
                     all_subscribers=all_subscribers,
+                    within_tag_id=tag_id if action == "remove" else None,
                 )
             except ValueError as err:
                 raise click.ClickException(str(err)) from err
@@ -273,8 +285,6 @@ def _run_tag_mutation(
                 click.echo("No subscribers matched. Nothing to do.")
                 return
 
-            tag = tags_workflow.resolve_tag(client, tag_ref, create_missing=create_missing)
-            tag_label = tag.get("name") or f"id {tag.get('id')}"
             count = len(targets)
 
             if dry_run:
@@ -292,7 +302,7 @@ def _run_tag_mutation(
             if not assume_yes:
                 click.confirm(f"{verb} tag {tag_label!r} {prep} {count} subscriber(s)?", abort=True)
 
-            result = tags_workflow.apply_tag(client, int(str(tag["id"])), targets, action=action)
+            result = tags_workflow.apply_tag(client, tag_id, targets, action=action)
     except TagResolutionError as err:
         raise click.ClickException(str(err)) from err
     except KitAPIError as err:

@@ -280,6 +280,19 @@ class KitClient:
         """Yield every tag applied to a single subscriber."""
         return self._iter_paginated(f"/subscribers/{subscriber_id}/tags", "tags", per_page=per_page)
 
+    def iter_tag_subscribers(
+        self, tag_id: int, *, status: str | None = None, per_page: int | None = None
+    ) -> Iterator[dict[str, Any]]:
+        """Yield the subscribers who currently have ``tag_id``.
+
+        ``status`` filters by subscriber state; pass ``"all"`` for every state
+        (Kit's endpoint defaults to ``active`` only). Lets a caller act on just
+        the tag's holders instead of scanning every subscriber.
+        """
+        return self._iter_paginated(
+            f"/tags/{tag_id}/subscribers", "subscribers", status=status, per_page=per_page
+        )
+
     def create_tag(self, name: str) -> dict[str, Any]:
         """Create a tag (idempotent — returns the existing tag if the name exists).
 

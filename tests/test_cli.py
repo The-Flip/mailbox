@@ -241,6 +241,40 @@ def test_tags_remove_reports_summary(patched_client):
     assert "1 untagged, 0 failed." in result.output
 
 
+def test_tags_remove_all_scopes_to_tag_holders(patched_client):
+    """`remove --all` enumerates the tag's subscribers and deletes only those —
+    it must never scan the whole account via GET /v4/subscribers."""
+    deletes: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path, method = request.url.path, request.method
+        if path == "/v4/tags" and method == "GET":
+            return httpx.Response(
+                200,
+                json={"tags": [{"id": 5, "name": "VIP"}], "pagination": {"has_next_page": False}},
+            )
+        if path == "/v4/tags/5/subscribers" and method == "GET":
+            assert request.url.params["status"] == "all"
+            return httpx.Response(
+                200,
+                json={
+                    "subscribers": [{"id": 1}, {"id": 2}],
+                    "pagination": {"has_next_page": False},
+                },
+            )
+        if method == "DELETE":
+            deletes.append(path)
+            return httpx.Response(204)
+        raise AssertionError(f"unexpected call {method} {path} (did it scan all subscribers?)")
+
+    patched_client(handler)
+    result = CliRunner().invoke(cli_module.cli, ["tags", "remove", "VIP", "--all", "--yes"])
+
+    assert result.exit_code == 0, result.output
+    assert "2 untagged, 0 failed." in result.output
+    assert deletes == ["/v4/tags/5/subscribers/1", "/v4/tags/5/subscribers/2"]
+
+
 def test_tags_add_from_stdin(patched_client):
     """--from-file - reads ids/emails from stdin."""
     tagged: list[str] = []

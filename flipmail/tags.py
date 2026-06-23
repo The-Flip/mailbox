@@ -96,19 +96,33 @@ def collect_targets(
     from_status: str | None = None,
     all_subscribers: bool = False,
     limit: int | None = None,
+    within_tag_id: int | None = None,
 ) -> list[Target]:
     """Gather and de-duplicate the subscribers to act on.
 
     ``tokens`` are positional ids/emails. ``from_status`` / ``all_subscribers``
-    pull a segment from Kit (id-addressed). ``limit`` caps a segment pull.
+    pull a segment (id-addressed). ``limit`` caps a segment pull.
+
+    ``within_tag_id`` scopes the segment to subscribers who already hold that
+    tag, via ``GET /tags/{id}/subscribers`` — used by ``remove`` so a segment
+    only touches the tag's holders instead of every subscriber in the account.
+    Positional ``tokens`` are always honored as given, tag membership aside.
     """
     targets: list[Target] = [parse_target(token) for token in tokens]
 
     if all_subscribers or from_status is not None:
-        status = from_status if not all_subscribers else None
-        for count, subscriber in enumerate(
-            client.iter_subscribers(status=status, per_page=1000), start=1
-        ):
+        if within_tag_id is not None:
+            # Only subscribers who have the tag. "all" overrides Kit's
+            # active-only default so we reach holders in every state.
+            source = client.iter_tag_subscribers(
+                within_tag_id,
+                status=from_status if from_status is not None else "all",
+                per_page=1000,
+            )
+        else:
+            status = from_status if not all_subscribers else None
+            source = client.iter_subscribers(status=status, per_page=1000)
+        for count, subscriber in enumerate(source, start=1):
             targets.append(Target(subscriber_id=int(subscriber["id"])))
             if limit is not None and count >= limit:
                 break
