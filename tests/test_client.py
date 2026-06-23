@@ -225,6 +225,24 @@ def test_iter_tags_follows_pagination(make_client):
     assert names == ["A", "B"]
 
 
+def test_iter_tag_subscribers_passes_status_and_paginates(make_client):
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v4/tags/5/subscribers"
+        assert request.url.params["status"] == "all"
+        return httpx.Response(
+            200,
+            json={
+                "subscribers": [{"id": 1}, {"id": 2}],
+                "pagination": {"has_next_page": False},
+            },
+        )
+
+    with make_client(handler) as client:
+        ids = [s["id"] for s in client.iter_tag_subscribers(5, status="all")]
+
+    assert ids == [1, 2]
+
+
 def test_iter_subscriber_tags(make_client):
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/v4/subscribers/7/tags"

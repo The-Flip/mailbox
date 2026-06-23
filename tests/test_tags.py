@@ -101,6 +101,37 @@ def test_collect_targets_from_status_paginates(make_client):
     assert [t.subscriber_id for t in targets] == [1, 2]
 
 
+def test_collect_targets_within_tag_scopes_to_holders(make_client):
+    """With within_tag_id, --all pulls from the tag's subscribers (status=all)."""
+    paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        assert request.url.params["status"] == "all"
+        return httpx.Response(
+            200, json={"subscribers": [{"id": 7}], "pagination": {"has_next_page": False}}
+        )
+
+    with make_client(handler) as client:
+        targets = collect_targets(client, all_subscribers=True, within_tag_id=5)
+
+    assert [t.subscriber_id for t in targets] == [7]
+    assert paths == ["/v4/tags/5/subscribers"]  # never scans GET /v4/subscribers
+
+
+def test_collect_targets_within_tag_passes_from_status(make_client):
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v4/tags/5/subscribers"
+        assert request.url.params["status"] == "inactive"
+        return httpx.Response(
+            200, json={"subscribers": [{"id": 7}], "pagination": {"has_next_page": False}}
+        )
+
+    with make_client(handler) as client:
+        targets = collect_targets(client, from_status="inactive", within_tag_id=5)
+    assert [t.subscriber_id for t in targets] == [7]
+
+
 # -- apply_tag -------------------------------------------------------------
 
 

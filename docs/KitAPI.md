@@ -70,6 +70,7 @@ Tags are how we segment subscribers. The endpoints we use (all via `KitClient`):
 | -------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------- |
 | List tags                  | `GET /tags`                              | Cursor-paginated; each tag has `id`, `name`, `subscriber_count`.                        |
 | List a subscriber's tags   | `GET /subscribers/{id}/tags`             | Tags include `tagged_at`.                                                               |
+| List a tag's subscribers   | `GET /tags/{tag_id}/subscribers`         | Cursor-paginated; `status` defaults to `active` (pass `all` for every state).           |
 | Subscribers **with** tags  | `GET /subscribers?include=tags`          | Tags inline (`id`, `name`) — one sweep, no N+1.                                         |
 | Create a tag               | `POST /tags` `{"name": ...}`             | Idempotent: 200 if the name already exists.                                             |
 | Add tag to subscriber      | `POST /tags/{tag_id}/subscribers/{id}`   | Or `.../subscribers` with `{"email_address": ...}`. Idempotent (200 if already tagged). |
@@ -80,6 +81,8 @@ Tags are how we segment subscribers. The endpoints we use (all via `KitClient`):
 ### Bulk: why we loop instead of using `/v4/bulk/*`
 
 Kit's true bulk endpoints (`POST`/`DELETE /v4/bulk/tags/subscribers`, ≤100 taggings sync / async above) **require OAuth and reject API-key auth**. This project authenticates with an API key, so "bulk" tag operations are implemented by **looping the per-subscriber endpoints** with rate-limit backoff (see `flipmail/tags.py::apply_tag`). That keeps us within the 120 req/60s API-key limit at the cost of speed. The loop engine returns a `{successes, failures}` result shaped like Kit's bulk response, so a future OAuth-backed bulk path can replace just that function without changing the CLI.
+
+Because looping is one call per subscriber, **scoping matters for `remove`**: a bulk untag (`--all` / `--from-status`) enumerates holders via `GET /tags/{tag_id}/subscribers` (status `all`), so it costs one DELETE per tag holder rather than one per subscriber in the account. `add --all` necessarily targets every subscriber (you're tagging people who don't have it yet), so it can't be scoped this way.
 
 ## Safety
 

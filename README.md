@@ -77,6 +77,11 @@ automations and send email**, so it can't be undone — preview first. Bulk runs
 loop one API call per subscriber (API keys can't use Kit's bulk endpoints), so
 large batches are rate-limited to ~120/min and take a while.
 
+For `remove`, `--all` and `--from-status` only touch subscribers who actually have
+the tag (looked up via the tag's subscriber list), so a bulk untag costs one call
+per holder, not one per subscriber in the account. (`add --all` necessarily targets
+everyone, since you're tagging people who don't have it yet.)
+
 Example output:
 
 ```text
