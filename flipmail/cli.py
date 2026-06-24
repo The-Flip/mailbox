@@ -333,8 +333,16 @@ def _echo_targets(targets: Sequence[tags_workflow.Target], cap: int = 20) -> Non
 
 def _report_result(result: tags_workflow.BulkResult, *, action: tags_workflow.TagAction) -> None:
     """Print a summary of a bulk tag operation and exit nonzero on any failure."""
-    verb = "tagged" if action == "add" else "untagged"
-    click.echo(f"{len(result.successes)} {verb}, {len(result.failures)} failed.")
+    if action == "add":
+        click.echo(f"{len(result.successes)} tagged, {len(result.failures)} failed.")
+    else:
+        # "removed" = the subscriber really had the tag; "weren't tagged" = no-op
+        # (Kit's tag index can list subscribers who no longer hold the tag).
+        click.echo(
+            f"{len(result.successes)} removed, "
+            f"{len(result.skipped)} weren't tagged, "
+            f"{len(result.failures)} failed."
+        )
     if result.failures:
         click.echo("Failures:")
         for item in result.failures:
