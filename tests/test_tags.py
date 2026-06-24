@@ -132,6 +132,17 @@ def test_collect_targets_within_tag_passes_from_status(make_client):
     assert [t.subscriber_id for t in targets] == [7]
 
 
+def test_collect_targets_within_tag_404_raises_resolution_error(make_client):
+    """A 404 listing a tag's subscribers means the tag id doesn't exist."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"errors": ["Not Found"]})
+
+    with make_client(handler, max_retries=0) as client:
+        with pytest.raises(TagResolutionError, match="No tag with id 5"):
+            collect_targets(client, all_subscribers=True, within_tag_id=5)
+
+
 # -- apply_tag -------------------------------------------------------------
 
 
@@ -172,15 +183,76 @@ def test_apply_tag_rejects_unknown_action(make_client):
             apply_tag(client, 5, [Target(subscriber_id=1)], action=cast("TagAction", "sync"))
 
 
-def test_apply_tag_remove(make_client):
-    seen: list[str] = []
+def test_apply_tag_remove_deletes_when_tag_present(make_client):
+    """Remove verifies the tag is really there, then DELETEs and counts it."""
+    calls: list[tuple[str, str]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        seen.append(request.method)
-        return httpx.Response(204)
+        calls.append((request.method, request.url.path))
+        if request.method == "GET":  # authoritative per-subscriber tag list
+            return httpx.Response(
+                200,
+                json={"tags": [{"id": 5, "name": "VIP"}], "pagination": {"has_next_page": False}},
+            )
+        return httpx.Response(204)  # DELETE
 
     with make_client(handler) as client:
         result = apply_tag(client, 5, [Target(subscriber_id=1)], action="remove")
 
-    assert seen == ["DELETE"]
+    assert calls == [("GET", "/v4/subscribers/1/tags"), ("DELETE", "/v4/tags/5/subscribers/1")]
     assert len(result.successes) == 1
+    assert not result.skipped
+
+
+def test_apply_tag_remove_skips_phantom_without_deleting(make_client):
+    """If the subscriber doesn't really have the tag, skip — no DELETE, not a false success."""
+    methods: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        methods.append(request.method)
+        if request.method == "GET":
+            return httpx.Response(200, json={"tags": [], "pagination": {"has_next_page": False}})
+        raise AssertionError("must not DELETE a tag the subscriber doesn't have")
+
+    with make_client(handler) as client:
+        result = apply_tag(client, 5, [Target(subscriber_id=1)], action="remove")
+
+    assert methods == ["GET"]  # checked, then skipped
+    assert not result.successes
+    assert len(result.skipped) == 1
+    assert result.skipped[0].detail == "was not tagged"
+
+
+def test_apply_tag_remove_by_email_resolves_id(make_client):
+    """An email target is resolved to an id before verifying/removing."""
+    paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        if request.url.path == "/v4/subscribers" and request.url.params.get("email_address"):
+            return httpx.Response(
+                200, json={"subscribers": [{"id": 9}], "pagination": {"has_next_page": False}}
+            )
+        if request.url.path == "/v4/subscribers/9/tags":
+            return httpx.Response(
+                200, json={"tags": [{"id": 5}], "pagination": {"has_next_page": False}}
+            )
+        return httpx.Response(204)
+
+    with make_client(handler) as client:
+        result = apply_tag(client, 5, [Target(email="a@b.co")], action="remove")
+
+    assert "/v4/tags/5/subscribers/9" in paths  # deleted by the resolved id
+    assert len(result.successes) == 1
+
+
+def test_apply_tag_remove_unknown_email_is_failure(make_client):
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"subscribers": [], "pagination": {"has_next_page": False}})
+
+    with make_client(handler) as client:
+        result = apply_tag(client, 5, [Target(email="ghost@b.co")], action="remove")
+
+    assert not result.successes
+    assert len(result.failures) == 1
+    assert "no such subscriber" in result.failures[0].detail

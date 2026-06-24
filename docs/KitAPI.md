@@ -78,6 +78,8 @@ Tags are how we segment subscribers. The endpoints we use (all via `KitClient`):
 
 **Adding a tag can trigger automations.** In Kit, tags commonly trigger automations/sequences that send email. Treat `add_tag` as a sending operation: dry-run first, confirm, and never tag a live segment "to test." See [Safety](#safety).
 
+**Tag-indexed views are eventually consistent.** `GET /tags/{id}/subscribers` and `GET /subscribers?include=tags` lag and can go stale — they may list a subscriber who no longer holds the tag (and miss one just added). The authoritative, operation-consistent view is the per-subscriber `GET /subscribers/{id}/tags`. A `DELETE` on a phantom association returns `204` but changes nothing. So `remove` **verifies against the per-subscriber list** before deleting, and reports "removed" only when the tag was really present (otherwise "weren't tagged") — never a false success on a no-op. Note Kit may delete orphaned/import tags on its own, after which `GET /tags/{id}/subscribers` returns `404` (the id no longer exists).
+
 ### Bulk: why we loop instead of using `/v4/bulk/*`
 
 Kit's true bulk endpoints (`POST`/`DELETE /v4/bulk/tags/subscribers`, ≤100 taggings sync / async above) **require OAuth and reject API-key auth**. This project authenticates with an API key, so "bulk" tag operations are implemented by **looping the per-subscriber endpoints** with rate-limit backoff (see `flipmail/tags.py::apply_tag`). That keeps us within the 120 req/60s API-key limit at the cost of speed. The loop engine returns a `{successes, failures}` result shaped like Kit's bulk response, so a future OAuth-backed bulk path can replace just that function without changing the CLI.

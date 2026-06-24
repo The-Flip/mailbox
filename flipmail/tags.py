@@ -19,7 +19,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
-from flipmail.kit import KitAPIError, KitClient
+from flipmail.kit import KitAPIError, KitClient, KitNotFoundError
 
 TagAction = Literal["add", "remove"]
 
@@ -122,10 +122,17 @@ def collect_targets(
         else:
             status = from_status if not all_subscribers else None
             source = client.iter_subscribers(status=status, per_page=1000)
-        for count, subscriber in enumerate(source, start=1):
-            targets.append(Target(subscriber_id=int(subscriber["id"])))
-            if limit is not None and count >= limit:
-                break
+        try:
+            for count, subscriber in enumerate(source, start=1):
+                targets.append(Target(subscriber_id=int(subscriber["id"])))
+                if limit is not None and count >= limit:
+                    break
+        except KitNotFoundError as err:
+            # An existing tag with no holders returns 200 []; a 404 here means
+            # the tag id itself doesn't exist.
+            if within_tag_id is not None:
+                raise TagResolutionError(f"No tag with id {within_tag_id}.") from err
+            raise
 
     # Dedupe while preserving order.
     seen: set[tuple[str, object]] = set()
@@ -148,14 +155,29 @@ class ItemResult:
 
 @dataclass
 class BulkResult:
-    """Accumulated outcomes of a tag operation across many targets."""
+    """Accumulated outcomes of a tag operation across many targets.
+
+    ``successes`` are real changes (added, or removed-when-present). ``skipped``
+    are no-ops we deliberately didn't perform — e.g. removing a tag a subscriber
+    didn't actually have. ``failures`` are errors.
+    """
 
     successes: list[ItemResult] = field(default_factory=list)
+    skipped: list[ItemResult] = field(default_factory=list)
     failures: list[ItemResult] = field(default_factory=list)
 
     @property
     def total(self) -> int:
-        return len(self.successes) + len(self.failures)
+        return len(self.successes) + len(self.skipped) + len(self.failures)
+
+
+def _subscriber_id_for(client: KitClient, target: Target) -> int | None:
+    """Resolve a target to a subscriber id (looking up an email if needed)."""
+    if target.subscriber_id is not None:
+        return target.subscriber_id
+    if target.email is not None:
+        return client.find_subscriber_id_by_email(target.email)
+    return None
 
 
 def apply_tag(
@@ -169,8 +191,14 @@ def apply_tag(
 
     A failure on one target (e.g. an unknown email) is recorded and the loop
     continues — one bad target never aborts the batch. The client's built-in
-    backoff handles rate limits. Returns a :class:`BulkResult` summarizing every
-    target's outcome.
+    backoff handles rate limits.
+
+    **Remove is verified.** Kit's tag-indexed views are eventually consistent and
+    can list subscribers who no longer hold a tag; a ``DELETE`` on such a phantom
+    returns 204 but changes nothing. So for ``remove`` we first check the
+    authoritative per-subscriber tag list (``GET /subscribers/{id}/tags``) and
+    only delete (and count as removed) when the tag is really present — otherwise
+    the target is reported as skipped, not as a false "removed".
     """
     result = BulkResult()
     for target in targets:
@@ -179,10 +207,25 @@ def apply_tag(
                 client.add_tag(tag_id, subscriber_id=target.subscriber_id, email=target.email)
                 result.successes.append(ItemResult(target, True, "tagged"))
             elif action == "remove":
-                client.remove_tag(tag_id, subscriber_id=target.subscriber_id, email=target.email)
-                result.successes.append(ItemResult(target, True, "untagged"))
+                _remove_one(client, tag_id, target, result)
             else:  # defensive: never silently fall through to a destructive default
                 raise ValueError(f"Unsupported tag action {action!r}; expected 'add' or 'remove'.")
         except KitAPIError as err:
             result.failures.append(ItemResult(target, False, str(err)))
     return result
+
+
+def _remove_one(client: KitClient, tag_id: int, target: Target, result: BulkResult) -> None:
+    """Remove ``tag_id`` from one target, but only if it really has the tag."""
+    subscriber_id = _subscriber_id_for(client, target)
+    if subscriber_id is None:
+        result.failures.append(ItemResult(target, False, "no such subscriber"))
+        return
+
+    held = {int(t["id"]) for t in client.iter_subscriber_tags(subscriber_id)}
+    if tag_id not in held:
+        result.skipped.append(ItemResult(target, True, "was not tagged"))
+        return
+
+    client.remove_tag(tag_id, subscriber_id=subscriber_id)
+    result.successes.append(ItemResult(target, True, "removed"))

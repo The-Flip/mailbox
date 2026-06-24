@@ -82,6 +82,11 @@ the tag (looked up via the tag's subscriber list), so a bulk untag costs one cal
 per holder, not one per subscriber in the account. (`add --all` necessarily targets
 everyone, since you're tagging people who don't have it yet.)
 
+`remove` verifies each subscriber actually has the tag before deleting, so it reports
+`N removed, M weren't tagged, K failed` — never a false "removed" on a no-op. (Kit's
+tag listings are eventually consistent and can show subscribers who no longer hold a
+tag; the per-subscriber check is the source of truth.)
+
 Example output:
 
 ```text

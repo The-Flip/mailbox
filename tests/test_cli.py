@@ -232,18 +232,43 @@ def test_tags_remove_reports_summary(patched_client):
                 200,
                 json={"tags": [{"id": 5, "name": "VIP"}], "pagination": {"has_next_page": False}},
             )
-        return httpx.Response(204)
+        if request.url.path == "/v4/subscribers/1/tags":  # authoritative check: has the tag
+            return httpx.Response(
+                200, json={"tags": [{"id": 5}], "pagination": {"has_next_page": False}}
+            )
+        return httpx.Response(204)  # DELETE
 
     patched_client(handler)
     result = CliRunner().invoke(cli_module.cli, ["tags", "remove", "VIP", "1", "--yes"])
 
     assert result.exit_code == 0, result.output
-    assert "1 untagged, 0 failed." in result.output
+    assert "1 removed, 0 weren't tagged, 0 failed." in result.output
+
+
+def test_tags_remove_phantom_reports_not_tagged(patched_client):
+    """A subscriber the tag index lists but who doesn't really have the tag is
+    reported as 'weren't tagged', not a false 'removed' — and no DELETE fires."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v4/tags":
+            return httpx.Response(
+                200,
+                json={"tags": [{"id": 5, "name": "VIP"}], "pagination": {"has_next_page": False}},
+            )
+        if request.url.path == "/v4/subscribers/1/tags":
+            return httpx.Response(200, json={"tags": [], "pagination": {"has_next_page": False}})
+        raise AssertionError("must not DELETE when the subscriber isn't really tagged")
+
+    patched_client(handler)
+    result = CliRunner().invoke(cli_module.cli, ["tags", "remove", "VIP", "1", "--yes"])
+
+    assert result.exit_code == 0, result.output
+    assert "0 removed, 1 weren't tagged, 0 failed." in result.output
 
 
 def test_tags_remove_all_scopes_to_tag_holders(patched_client):
-    """`remove --all` enumerates the tag's subscribers and deletes only those —
-    it must never scan the whole account via GET /v4/subscribers."""
+    """`remove --all` enumerates the tag's subscribers (never scanning the whole
+    account), verifies each really has the tag, then deletes only those."""
     deletes: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -262,6 +287,10 @@ def test_tags_remove_all_scopes_to_tag_holders(patched_client):
                     "pagination": {"has_next_page": False},
                 },
             )
+        if path in ("/v4/subscribers/1/tags", "/v4/subscribers/2/tags") and method == "GET":
+            return httpx.Response(
+                200, json={"tags": [{"id": 5}], "pagination": {"has_next_page": False}}
+            )
         if method == "DELETE":
             deletes.append(path)
             return httpx.Response(204)
@@ -271,7 +300,7 @@ def test_tags_remove_all_scopes_to_tag_holders(patched_client):
     result = CliRunner().invoke(cli_module.cli, ["tags", "remove", "VIP", "--all", "--yes"])
 
     assert result.exit_code == 0, result.output
-    assert "2 untagged, 0 failed." in result.output
+    assert "2 removed, 0 weren't tagged, 0 failed." in result.output
     assert deletes == ["/v4/tags/5/subscribers/1", "/v4/tags/5/subscribers/2"]
 
 
@@ -323,6 +352,21 @@ def test_tags_add_failure_exits_nonzero(patched_client):
     assert result.exit_code != 0
     assert "0 tagged, 1 failed." in result.output
     assert "Failures:" in result.output
+
+
+def test_tags_remove_all_nonexistent_id_reported_cleanly(patched_client):
+    """`remove <bad-id> --all` reports a clean 'no tag' message, not a raw 404."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        # numeric tag id skips the /v4/tags lookup; the tag-subscribers list 404s
+        return httpx.Response(404, json={"errors": ["Not Found"]})
+
+    patched_client(handler)
+    result = CliRunner().invoke(cli_module.cli, ["tags", "remove", "999999", "--all", "--yes"])
+
+    assert result.exit_code != 0
+    assert "No tag with id 999999" in result.output
+    assert "Kit API error" not in result.output
 
 
 def test_tags_unknown_name_reported_cleanly(patched_client):

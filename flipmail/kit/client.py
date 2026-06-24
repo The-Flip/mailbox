@@ -201,6 +201,17 @@ class KitClient:
         body = self.get(f"/subscribers/{subscriber_id}")
         return body["subscriber"]
 
+    def find_subscriber_id_by_email(self, email: str) -> int | None:
+        """Return the id of the subscriber with ``email``, or ``None`` if absent.
+
+        Uses Kit's ``email_address`` filter on the subscribers list.
+        """
+        body = self.list_subscribers(email_address=email, per_page=1)
+        subscribers = body.get("subscribers") or []
+        if not subscribers:
+            return None
+        return int(subscribers[0]["id"])
+
     def list_subscribers(
         self,
         *,
